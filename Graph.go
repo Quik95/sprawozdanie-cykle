@@ -2,7 +2,6 @@ package Cykle
 
 import (
 	"fmt"
-	"github.com/emirpasic/gods/sets/hashset"
 	"github.com/emirpasic/gods/stacks/arraystack"
 	"golang.org/x/exp/slices"
 	"math"
@@ -19,6 +18,11 @@ type Graph struct {
 type Vertex struct {
 	Root     int
 	Adjacent *LinkedList
+}
+
+func init() {
+	//rand.Seed(42)
+	rand.Seed(time.Now().UnixNano())
 }
 
 func (v Vertex) GetAllNextUnvisited(visited []int) []int {
@@ -81,38 +85,60 @@ func (g Graph) CheckEdge(vertexOne, vertexTwo int) bool {
 func NewGraphWithDensity(size int, density float64) Graph {
 	g := NewGraph(size)
 
-	initial := hashset.New()
+	isolated := make([]int, 0, size)
 	for _, v := range g.VerticesList {
-		initial.Add(v.Root)
+		isolated = append(isolated, v.Root)
 	}
-	// make sure the graph is connected
-	// [0, size) => [1, size+1)
-	curr := rand.Intn(size) + 1
-	initial.Remove(curr)
+	rand.Shuffle(size, func(i, j int) {
+		isolated[i], isolated[j] = isolated[j], isolated[i]
+	})
 
-	for initial.Size() > 0 {
-		values := initial.Values()
-		adj := values[rand.Intn(len(values))].(int)
-		g.AddEdge(curr, adj)
-		initial.Remove(adj)
-		curr = adj
+	numberOfEdges := int(math.Floor((density * float64(size*(size-1))) / 2))
+
+	var (
+		vertexOne, vertexTwo, vertexThree int
+	)
+
+	for len(isolated) >= 3 {
+		g.AddEdge(isolated[0], isolated[1])
+		g.AddEdge(isolated[1], isolated[2])
+		g.AddEdge(isolated[0], isolated[2])
+		isolated = isolated[3:]
+		numberOfEdges -= 3
 	}
 
-	numberOfEdges := int(math.Floor(density*float64(size*(size-1))) / 2)
-	missingEdges := numberOfEdges - g.EdgeCount()
+	if len(isolated) > 0 {
+		if len(isolated) > 0 {
+			vertexOne = isolated[0]
+			isolated = isolated[1:]
+		}
 
-	for i := 0; i < missingEdges; i++ {
-		var vertexOne, vertexTwo int
-		for ok := true; ok; ok = vertexOne == vertexTwo || g.CheckEdge(vertexOne, vertexTwo) {
-			vertexOne = rand.Intn(size) + 1
-			vertexTwo = rand.Intn(size) + 1
+		if len(isolated) > 0 {
+			vertexTwo = isolated[0]
+		}
+
+		for ok := true; ok; ok = vertexOne == vertexTwo || g.CheckEdge(vertexOne, vertexTwo) || vertexOne == vertexThree || g.CheckEdge(vertexOne, vertexThree) || vertexTwo == vertexThree || g.CheckEdge(vertexTwo, vertexThree) {
+			if len(isolated) != 1 {
+				vertexTwo = rand.Intn(size) + 1
+			}
+			vertexThree = rand.Intn(size) + 1
 		}
 		g.AddEdge(vertexOne, vertexTwo)
+		g.AddEdge(vertexTwo, vertexThree)
+		g.AddEdge(vertexOne, vertexThree)
+		numberOfEdges -= 3
 	}
 
-	uneven := g.getAllUneven()
-	for i := 0; i < len(uneven); i += 2 {
-		g.AddEdge(uneven[i], uneven[i+1])
+	for i := 1; i < numberOfEdges; i += 3 {
+		for ok := true; ok; ok = vertexOne == vertexTwo || g.CheckEdge(vertexOne, vertexTwo) || vertexOne == vertexThree || g.CheckEdge(vertexOne, vertexThree) || vertexTwo == vertexThree || g.CheckEdge(vertexTwo, vertexThree) {
+			vertexOne = rand.Intn(size) + 1
+			vertexTwo = rand.Intn(size) + 1
+			vertexThree = rand.Intn(size) + 1
+		}
+
+		g.AddEdge(vertexOne, vertexTwo)
+		g.AddEdge(vertexTwo, vertexThree)
+		g.AddEdge(vertexOne, vertexThree)
 	}
 
 	return g
@@ -257,34 +283,6 @@ func (g *Graph) MeasureHamilton(all bool) (int, float64, float64) {
 	}
 
 	return t.nResults, t.timeFirst, timeForAll
-}
-
-func hamilton(g Graph, size, current int, res, visited []int, all bool, nResults *int, timeStart time.Time, timeFirst *float64) {
-	if !all && *timeFirst != float64(0) {
-		return
-	}
-
-	res = append(res, current)
-	if len(res) != size {
-		visited = append(visited, current)
-		for _, adj := range g.GetVertex(current).Adjacent.Values() {
-			if !all && *timeFirst != float64(0) {
-				return
-			}
-			if !slices.Contains(visited, adj) {
-				hamilton(g, size, adj, res, visited, all, nResults, timeStart, timeFirst)
-			}
-		}
-		idx := slices.Index(visited, current)
-		visited = slices.Delete(visited, idx, idx)
-	} else if g.CheckEdge(current, g.VerticesList[0].Root) {
-		*nResults += 1
-		if *timeFirst == float64(0) {
-			*timeFirst = time.Since(timeStart).Seconds()
-		}
-	}
-
-	res = res[:len(res)-1]
 }
 
 type TimingStuff struct {

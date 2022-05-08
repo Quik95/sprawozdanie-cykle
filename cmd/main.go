@@ -6,19 +6,22 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime/debug"
 	"time"
 
 	"golang.org/x/exp/constraints"
 )
 
 func main() {
+	debug.SetGCPercent(10000)
+
 	var (
 		n, n02, n06                    []int
 		e02, e06, h02, h06, ha02, ha06 []float64
 	)
 
 	size := 10
-	for ; size < 15; size++ {
+	for ; size <= 15; size++ {
 
 		n = append(n, size)
 
@@ -50,6 +53,8 @@ func main() {
 		log.Printf("First Hamilton circuit for n=%d, d=%.1f = %fs", size, 0.6, timeFirst06)
 		log.Printf("All Hamilton circuit for n=%d, d=%.1f = %fs", size, 0.6, timeAll06)
 	}
+
+	size--
 
 	for i := 0; i < 10; i++ {
 
