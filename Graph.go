@@ -209,6 +209,15 @@ func (g Graph) CheckIfEulerian() bool {
 	return true
 }
 
+func (g Graph) CheckIfForIsolated() bool {
+	for _, v := range g.VerticesList {
+		if v.Adjacent.Size() == 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func (g Graph) GetEulerianCircuit() []int {
 	var res []int
 	stack := arraystack.New()
@@ -230,24 +239,28 @@ func (g Graph) GetEulerianCircuit() []int {
 	return res
 }
 
-var nResults int
-var timeStart time.Time
-var timeFirst time.Duration
-var timeFirstTaken bool
+func (g *Graph) MeasureHamilton(all bool) (int, float64, float64) {
+	t := TimingStuff{
+		timeStart: time.Now(),
+		timeFirst: 0,
+		nResults:  0,
+		all:       all,
+	}
 
-func (g Graph) MeasureHamilton(all bool) (int, float64, float64) {
-	nResults = 0
-	timeFirstTaken = false
+	//hamilton(g, len(g.VerticesList), g.VerticesList[0].Root, []int{}, []int{}, all, &nResults, timeStart, &timeFirst)
+	first := g.VerticesList[0].Root
+	NewHamilton(g, []int{first}, []int{first}, first, len(g.VerticesList), &t)
+	timeForAll := time.Since(t.timeStart).Seconds()
 
-	timeStart = time.Now()
-	hamilton(g, len(g.VerticesList), g.VerticesList[0].Root, []int{}, []int{}, all)
-	timeForAll := time.Since(timeStart)
+	if t.timeFirst == float64(0) {
+		t.timeFirst = timeForAll
+	}
 
-	return nResults, timeFirst.Seconds(), timeForAll.Seconds()
+	return t.nResults, t.timeFirst, timeForAll
 }
 
-func hamilton(g Graph, size, current int, res, visited []int, all bool) {
-	if !all && timeFirstTaken {
+func hamilton(g Graph, size, current int, res, visited []int, all bool, nResults *int, timeStart time.Time, timeFirst *float64) {
+	if !all && *timeFirst != float64(0) {
 		return
 	}
 
@@ -255,19 +268,51 @@ func hamilton(g Graph, size, current int, res, visited []int, all bool) {
 	if len(res) != size {
 		visited = append(visited, current)
 		for _, adj := range g.GetVertex(current).Adjacent.Values() {
+			if !all && *timeFirst != float64(0) {
+				return
+			}
 			if !slices.Contains(visited, adj) {
-				hamilton(g, size, adj, res, visited, all)
+				hamilton(g, size, adj, res, visited, all, nResults, timeStart, timeFirst)
 			}
 		}
 		idx := slices.Index(visited, current)
 		visited = slices.Delete(visited, idx, idx)
 	} else if g.CheckEdge(current, g.VerticesList[0].Root) {
-		nResults += 1
-		if timeFirstTaken == false {
-			timeFirst = time.Since(timeStart)
-			timeFirstTaken = true
+		*nResults += 1
+		if *timeFirst == float64(0) {
+			*timeFirst = time.Since(timeStart).Seconds()
 		}
 	}
 
 	res = res[:len(res)-1]
+}
+
+type TimingStuff struct {
+	timeStart time.Time
+	timeFirst float64
+	nResults  int
+	all       bool
+}
+
+func NewHamilton(g *Graph, res, visited []int, current, size int, t *TimingStuff) {
+	v := g.GetVertex(current)
+
+	if len(res) == size {
+		if v.Adjacent.Contains(g.VerticesList[0].Root) {
+			if t.timeFirst == float64(0) {
+				t.timeFirst = time.Since(t.timeStart).Seconds()
+			}
+			t.nResults++
+			return
+		}
+	}
+
+	for _, adj := range v.Adjacent.Values() {
+		if t.timeFirst != float64(0) && !t.all {
+			return
+		}
+		if !slices.Contains(visited, adj) {
+			NewHamilton(g, append(res, adj), append(visited, adj), adj, size, t)
+		}
+	}
 }
