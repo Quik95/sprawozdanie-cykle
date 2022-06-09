@@ -85,77 +85,31 @@ func (g Graph) CheckEdge(vertexOne, vertexTwo int) bool {
 func NewGraphWithDensity(size int, density float64) Graph {
 	g := NewGraph(size)
 
-	isolated := make([]int, 0, size)
-	for _, v := range g.VerticesList {
-		isolated = append(isolated, v.Root)
-	}
-	rand.Shuffle(size, func(i, j int) {
-		isolated[i], isolated[j] = isolated[j], isolated[i]
-	})
-
 	numberOfEdges := int(math.Floor((density * float64(size*(size-1))) / 2))
+	for numberOfEdges > 0 {
+		vertexOne := rand.Intn(size) + 1
+		vertexTwo := rand.Intn(size) + 1
 
-	var (
-		vertexOne, vertexTwo, vertexThree int
-	)
-
-	for len(isolated) >= 3 {
-		g.AddEdge(isolated[0], isolated[1])
-		g.AddEdge(isolated[1], isolated[2])
-		g.AddEdge(isolated[0], isolated[2])
-		isolated = isolated[3:]
-		numberOfEdges -= 3
+		for !g.CheckEdge(vertexOne, vertexTwo) && vertexOne != vertexTwo {
+			g.AddEdge(vertexOne, vertexTwo)
+			numberOfEdges--
+		}
 	}
 
-	if len(isolated) > 0 {
-		if len(isolated) > 0 {
-			vertexOne = isolated[0]
-			isolated = isolated[1:]
-		}
+	for i := 0; i < size-1; i++ {
+		if g.VerticesList[i].GetVertexDegree()%2 == 1 {
+			vertexTwo := rand.Intn(size-i) + i + 1
+			if g.CheckEdge(g.VerticesList[i].Root, vertexTwo) {
+				g.RemoveEdge(g.VerticesList[i].Root, vertexTwo)
 
-		if len(isolated) > 0 {
-			vertexTwo = isolated[0]
-		}
-
-		for ok := true; ok; ok = vertexOne == vertexTwo || g.CheckEdge(vertexOne, vertexTwo) || vertexOne == vertexThree || g.CheckEdge(vertexOne, vertexThree) || vertexTwo == vertexThree || g.CheckEdge(vertexTwo, vertexThree) {
-			if len(isolated) != 1 {
-				vertexTwo = rand.Intn(size) + 1
+			} else {
+				g.AddEdge(g.VerticesList[i].Root, vertexTwo)
 			}
-			vertexThree = rand.Intn(size) + 1
 		}
-		g.AddEdge(vertexOne, vertexTwo)
-		g.AddEdge(vertexTwo, vertexThree)
-		g.AddEdge(vertexOne, vertexThree)
-		numberOfEdges -= 3
 	}
 
-	for i := 1; i < numberOfEdges; i += 3 {
-		for ok := true; ok; ok = vertexOne == vertexTwo || g.CheckEdge(vertexOne, vertexTwo) || vertexOne == vertexThree || g.CheckEdge(vertexOne, vertexThree) || vertexTwo == vertexThree || g.CheckEdge(vertexTwo, vertexThree) {
-			vertexOne = rand.Intn(size) + 1
-			vertexTwo = rand.Intn(size) + 1
-			vertexThree = rand.Intn(size) + 1
-		}
-
-		g.AddEdge(vertexOne, vertexTwo)
-		g.AddEdge(vertexTwo, vertexThree)
-		g.AddEdge(vertexOne, vertexThree)
-	}
-
-	rest := g.CheckIfGraphIsConnected()
-	if len(rest) == 0 {
-		return g
-	}
-
-	for i := 0; i < len(rest); i += 3 {
-		vertexOne = rest[i]
-		for ok := true; ok; ok = vertexOne == vertexTwo || g.CheckEdge(vertexOne, vertexTwo) || vertexOne == vertexThree || g.CheckEdge(vertexOne, vertexThree) || vertexTwo == vertexThree || g.CheckEdge(vertexTwo, vertexThree) {
-			vertexTwo = rand.Intn(size) + 1
-			vertexThree = rand.Intn(size) + 1
-		}
-
-		g.AddEdge(vertexOne, vertexTwo)
-		g.AddEdge(vertexTwo, vertexThree)
-		g.AddEdge(vertexOne, vertexThree)
+	if !g.CheckIfEulerian() || g.CheckIfForIsolated() || !g.CheckIfGraphIsConnected() {
+		return NewGraphWithDensity(size, density)
 	}
 
 	return g
@@ -186,27 +140,7 @@ func bToMb(b uint64) uint64 {
 	return b / 1024 / 1024
 }
 
-func difference(slice1 []int, slice2 []int) []int {
-	diffStr := []int{}
-	m := map[int]int{}
-
-	for _, s1Val := range slice1 {
-		m[s1Val] = 1
-	}
-	for _, s2Val := range slice2 {
-		m[s2Val] = m[s2Val] + 1
-	}
-
-	for mKey, mVal := range m {
-		if mVal == 1 {
-			diffStr = append(diffStr, mKey)
-		}
-	}
-
-	return diffStr
-}
-
-func (g Graph) CheckIfGraphIsConnected() []int {
+func (g Graph) CheckIfGraphIsConnected() bool {
 	values := []int{g.VerticesList[0].Root}
 	stack := arraystack.New()
 	stack.Push(values[0])
@@ -215,11 +149,7 @@ func (g Graph) CheckIfGraphIsConnected() []int {
 
 	for len(values) != numberOfVertices {
 		if stack.Size() == 0 {
-			all := make([]int, 0, len(g.VerticesList))
-			for _, v := range g.VerticesList {
-				all = append(all, v.Root)
-			}
-			return difference(all, values)
+			return false
 		}
 
 		stackLast, _ := stack.Peek()
@@ -235,7 +165,7 @@ func (g Graph) CheckIfGraphIsConnected() []int {
 		stack.Push(allNext[0])
 	}
 
-	return []int{}
+	return true
 }
 
 func (g Graph) GetDensity() float64 {
