@@ -141,6 +141,23 @@ func NewGraphWithDensity(size int, density float64) Graph {
 		g.AddEdge(vertexOne, vertexThree)
 	}
 
+	rest := g.CheckIfGraphIsConnected()
+	if len(rest) == 0 {
+		return g
+	}
+
+	for i := 0; i < len(rest); i += 3 {
+		vertexOne = rest[i]
+		for ok := true; ok; ok = vertexOne == vertexTwo || g.CheckEdge(vertexOne, vertexTwo) || vertexOne == vertexThree || g.CheckEdge(vertexOne, vertexThree) || vertexTwo == vertexThree || g.CheckEdge(vertexTwo, vertexThree) {
+			vertexTwo = rand.Intn(size) + 1
+			vertexThree = rand.Intn(size) + 1
+		}
+
+		g.AddEdge(vertexOne, vertexTwo)
+		g.AddEdge(vertexTwo, vertexThree)
+		g.AddEdge(vertexOne, vertexThree)
+	}
+
 	return g
 }
 
@@ -169,7 +186,27 @@ func bToMb(b uint64) uint64 {
 	return b / 1024 / 1024
 }
 
-func (g Graph) CheckIfGraphIsConnected() bool {
+func difference(slice1 []int, slice2 []int) []int {
+	diffStr := []int{}
+	m := map[int]int{}
+
+	for _, s1Val := range slice1 {
+		m[s1Val] = 1
+	}
+	for _, s2Val := range slice2 {
+		m[s2Val] = m[s2Val] + 1
+	}
+
+	for mKey, mVal := range m {
+		if mVal == 1 {
+			diffStr = append(diffStr, mKey)
+		}
+	}
+
+	return diffStr
+}
+
+func (g Graph) CheckIfGraphIsConnected() []int {
 	values := []int{g.VerticesList[0].Root}
 	stack := arraystack.New()
 	stack.Push(values[0])
@@ -178,7 +215,11 @@ func (g Graph) CheckIfGraphIsConnected() bool {
 
 	for len(values) != numberOfVertices {
 		if stack.Size() == 0 {
-			return false
+			all := make([]int, 0, len(g.VerticesList))
+			for _, v := range g.VerticesList {
+				all = append(all, v.Root)
+			}
+			return difference(all, values)
 		}
 
 		stackLast, _ := stack.Peek()
@@ -194,7 +235,7 @@ func (g Graph) CheckIfGraphIsConnected() bool {
 		stack.Push(allNext[0])
 	}
 
-	return true
+	return []int{}
 }
 
 func (g Graph) GetDensity() float64 {
